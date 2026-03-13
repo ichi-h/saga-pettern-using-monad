@@ -40,9 +40,14 @@ case class Saga[A](run: SagaState => Future[Either[SagaFailure, (SagaState, A)]]
     run(initial).flatMap {
       case Right((finalState, result)) => Future.successful(Right((finalState, result)))
       case Left(err) =>
-        err.state.compensations.foldRight(Future.successful(())) { (comp, acc) =>
-          acc.flatMap(_ => comp(err.state).map(_ => ()))
-        }.map(_ => Left(err))
+        err.state.compensations.foldRight(Future.successful(err.state)) { (comp, accState) =>
+          accState.flatMap { currentState =>
+            comp(currentState).map {
+              case Right(nextState) => nextState
+              case Left(compErr)    => currentState.addStep(s"compensation failed: $compErr")
+            }
+          }
+        }.map(finalState => Left(err.copy(state = finalState)))
     }
 
 object Saga:

@@ -14,17 +14,17 @@ lazy val shared = project
     name := "shared"
   )
 
-lazy val pattern1 = project
-  .in(file("pattern1"))
+lazy val stdlibSaga = project
+  .in(file("stdlib-saga"))
   .dependsOn(shared)
   .settings(
     commonSettings,
-    name := "pattern1"
+    name := "stdlib-saga"
   )
 
 lazy val root = project
   .in(file("."))
-  .aggregate(shared, pattern1)
+  .aggregate(shared, stdlibSaga)
   .settings(
     name         := "saga-pattern-using-monad",
     version      := "0.1.0-SNAPSHOT",

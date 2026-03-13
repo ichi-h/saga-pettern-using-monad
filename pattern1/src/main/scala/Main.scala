@@ -7,12 +7,13 @@ given ExecutionContext = ExecutionContext.global
 type Compensation = SagaState => Future[Either[String, SagaState]]
 
 case class SagaState(steps: Vector[String], compensations: Vector[Compensation]):
-  def addStep(step: String): SagaState = copy(steps = steps :+ step)
+  def addStep(step: String): SagaState               = copy(steps = steps :+ step)
   def addCompensation(comp: Compensation): SagaState = copy(compensations = compensations :+ comp)
 
 case class SagaFailure(message: String, state: SagaState)
 
 case class Saga[A](run: SagaState => Future[Either[SagaFailure, (SagaState, A)]]):
+
   def map[B](f: A => B): Saga[B] =
     Saga(state => run(state).map(_.map { case (s, a) => (s, f(a)) }))
 
@@ -20,7 +21,7 @@ case class Saga[A](run: SagaState => Future[Either[SagaFailure, (SagaState, A)]]
     Saga { state =>
       run(state).flatMap {
         case Right((s1, a)) => f(a).run(s1)
-        case Left(err) => Future.successful(Left(err))
+        case Left(err)      => Future.successful(Left(err))
       }
     }
 
@@ -44,7 +45,12 @@ case class Saga[A](run: SagaState => Future[Either[SagaFailure, (SagaState, A)]]
     }
 
 object Saga:
-  def step[A](name: String, op: () => Future[Either[String, A]], undo: () => Future[Either[String, Unit]]): Saga[A] =
+
+  def step[A](
+      name: String,
+      op: () => Future[Either[String, A]],
+      undo: () => Future[Either[String, Unit]]
+  ): Saga[A] =
     val runStep: Saga[A] = Saga { state =>
       op().map {
         case Left(err) => Left(SagaFailure(s"$name failed: $err", state.addStep(s"$name failed")))
@@ -86,12 +92,17 @@ val noCompensation: () => Future[Either[String, Unit]] =
 object MockConfig:
   val failureRate: Double = 0.25
 
-def callWithLog(service: String, method: String, args: String = "", canFail: Boolean = true): Either[String, Unit] =
+def callWithLog(
+    service: String,
+    method: String,
+    args: String = "",
+    canFail: Boolean = true
+): Either[String, Unit] =
   val argStr = if args.nonEmpty then s"($args)" else "()"
-  println(s"[${service}] ${method}${argStr} を呼び出しました")
+  println(s"[$service] $method$argStr を呼び出しました")
   if canFail && scala.util.Random.nextDouble() < MockConfig.failureRate then
-    val msg = s"${service}.${method}: 障害が発生しました"
-    println(s"[${service}] ${method} 障害発生")
+    val msg = s"$service.$method: 障害が発生しました"
+    println(s"[$service] $method 障害発生")
     Left(msg)
   else
     Right(())
@@ -99,6 +110,7 @@ def callWithLog(service: String, method: String, args: String = "", canFail: Boo
 // --- サービス実装（モック） ---
 
 final class CartService:
+
   def getCartItems(userId: String): CartItems =
     println(s"[CartService] getCartItems(userId=$userId) を呼び出しました")
     CartItems(List(CartItem("product-A", 2), CartItem("product-B", 1)))
@@ -119,7 +131,12 @@ final class InventoryService:
   }
 
   def release(productIds: List[String]): Future[Either[String, Unit]] = Future {
-    callWithLog("InventoryService", "release", s"productIds=${productIds.mkString(",")}", canFail = false) match
+    callWithLog(
+      "InventoryService",
+      "release",
+      s"productIds=${productIds.mkString(",")}",
+      canFail = false
+    ) match
       case Left(err) => Left(err)
       case Right(_) =>
         reserved = reserved -- productIds
@@ -140,7 +157,12 @@ final class PaymentService:
   }
 
   def refund(userId: String, amount: Double): Future[Either[String, Unit]] = Future {
-    callWithLog("PaymentService", "refund", s"userId=$userId, amount=$amount", canFail = false) match
+    callWithLog(
+      "PaymentService",
+      "refund",
+      s"userId=$userId, amount=$amount",
+      canFail = false
+    ) match
       case Left(err) => Left(err)
       case Right(_) =>
         if charged then charged = false
@@ -150,14 +172,19 @@ final class PaymentService:
 final class OrderService:
   private var lastOrder: Option[OrderEntity] = None
 
-  def createOrder(userId: String, cartItems: CartItems): Future[Either[String, OrderEntity]] = Future {
-    callWithLog("OrderService", "createOrder", s"userId=$userId, items=${cartItems.items.size}件") match
-      case Left(err) => Left(err)
-      case Right(_) =>
-        val entity = OrderEntity(java.util.UUID.randomUUID().toString, userId, cartItems)
-        lastOrder = Some(entity)
-        Right(entity)
-  }
+  def createOrder(userId: String, cartItems: CartItems): Future[Either[String, OrderEntity]] =
+    Future {
+      callWithLog(
+        "OrderService",
+        "createOrder",
+        s"userId=$userId, items=${cartItems.items.size}件"
+      ) match
+        case Left(err) => Left(err)
+        case Right(_) =>
+          val entity = OrderEntity(java.util.UUID.randomUUID().toString, userId, cartItems)
+          lastOrder = Some(entity)
+          Right(entity)
+    }
 
   def cancelOrder(): Future[Either[String, Unit]] = Future {
     callWithLog("OrderService", "cancelOrder", canFail = false) match
@@ -189,24 +216,30 @@ final class ShippingService:
   }
 
 final class NotificationService:
-  def sendOrderConfirmation(userId: String, orderId: String): Future[Either[String, Unit]] = Future {
-    callWithLog("NotificationService", "sendOrderConfirmation", s"userId=$userId, orderId=$orderId") match
-      case Left(err) => Left(err)
-      case Right(_) => Right(())
-  }
+
+  def sendOrderConfirmation(userId: String, orderId: String): Future[Either[String, Unit]] =
+    Future {
+      callWithLog(
+        "NotificationService",
+        "sendOrderConfirmation",
+        s"userId=$userId, orderId=$orderId"
+      ) match
+        case Left(err) => Left(err)
+        case Right(_)  => Right(())
+    }
 
 @main def runCheckoutDemo(): Unit =
   val userId = "user-123" // Mock user ID
 
-  val cart = CartService()
-  val inventory = InventoryService()
-  val payment = PaymentService()
-  val order = OrderService()
-  val shipping = ShippingService()
+  val cart         = CartService()
+  val inventory    = InventoryService()
+  val payment      = PaymentService()
+  val order        = OrderService()
+  val shipping     = ShippingService()
   val notification = NotificationService()
 
   val cartItems = cart.getCartItems(userId)
-  val products = inventory.getProducts(cartItems)
+  val products  = inventory.getProducts(cartItems)
 
   val flow: Saga[OrderEntity] = for {
     _ <- Saga.step(
@@ -240,5 +273,5 @@ final class NotificationService:
     flow.exec(SagaState(Vector.empty, Vector.empty)),
     scala.concurrent.duration.Duration.Inf
   ) match
-    case Left(error) => println(s"Checkout failed: ${error.message}")
+    case Left(error)           => println(s"Checkout failed: ${error.message}")
     case Right((state, order)) => println(s"Checkout succeeded: Order ID ${order.id}")

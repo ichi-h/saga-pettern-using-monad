@@ -4,4 +4,8 @@
 sbt {project_name}/run
 sbt {project_name}/compile
 sbt compile
+
+sbt scalafmtAll
+sbt scalafmtSbt
+sbt scalafmtCheckAll
 ```

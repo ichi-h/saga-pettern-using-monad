@@ -7,8 +7,16 @@ lazy val commonSettings = Seq(
   libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test
 )
 
+lazy val shared = project
+  .in(file("shared"))
+  .settings(
+    commonSettings,
+    name := "shared"
+  )
+
 lazy val pattern1 = project
   .in(file("pattern1"))
+  .dependsOn(shared)
   .settings(
     commonSettings,
     name := "pattern1"
@@ -16,7 +24,7 @@ lazy val pattern1 = project
 
 lazy val root = project
   .in(file("."))
-  .aggregate(pattern1)
+  .aggregate(shared, pattern1)
   .settings(
     name         := "saga-pattern-using-monad",
     version      := "0.1.0-SNAPSHOT",

@@ -1,6 +1,7 @@
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 import scala.concurrent.Await
+import domain.*
+import mock.*
 
 given ExecutionContext = ExecutionContext.global
 
@@ -69,164 +70,9 @@ object Saga:
 
     runStep.withCompensation(compensation)
 
-// --- ドメインモデル ---
-
-case class CartItem(productId: String, quantity: Int)
-
-case class CartItems(items: List[CartItem]):
-  def toProductIds: List[String] = items.map(_.productId)
-
-case class Product(id: String, price: Double)
-
-case class Products(products: List[Product]):
-  def totalPrice: Double = products.map(_.price).sum
-
-case class OrderEntity(id: String, userId: String, items: CartItems)
-
 // 補償不要なステップに使う no-op undo
 val noCompensation: () => Future[Either[String, Unit]] =
   () => Future.successful(Right(()))
-
-// --- モック共通設定 ---
-
-object MockConfig:
-  val failureRate: Double = 0.25
-
-def callWithLog(
-    service: String,
-    method: String,
-    args: String = "",
-    canFail: Boolean = true
-): Either[String, Unit] =
-  val argStr = if args.nonEmpty then s"($args)" else "()"
-  println(s"[$service] $method$argStr を呼び出しました")
-  if canFail && scala.util.Random.nextDouble() < MockConfig.failureRate then
-    val msg = s"$service.$method: 障害が発生しました"
-    println(s"[$service] $method 障害発生")
-    Left(msg)
-  else
-    Right(())
-
-// --- サービス実装（モック） ---
-
-final class CartService:
-
-  def getCartItems(userId: String): CartItems =
-    println(s"[CartService] getCartItems(userId=$userId) を呼び出しました")
-    CartItems(List(CartItem("product-A", 2), CartItem("product-B", 1)))
-
-final class InventoryService:
-  private var reserved: Set[String] = Set.empty
-
-  def getProducts(cartItems: CartItems): Products =
-    println(s"[InventoryService] getProducts(${cartItems.items.size}件) を呼び出しました")
-    Products(cartItems.items.map(item => Product(item.productId, 500.0)))
-
-  def reserve(productIds: List[String]): Future[Either[String, Unit]] = Future {
-    callWithLog("InventoryService", "reserve", s"productIds=${productIds.mkString(",")}") match
-      case Left(err) => Left(err)
-      case Right(_) =>
-        reserved = reserved ++ productIds
-        Right(())
-  }
-
-  def release(productIds: List[String]): Future[Either[String, Unit]] = Future {
-    callWithLog(
-      "InventoryService",
-      "release",
-      s"productIds=${productIds.mkString(",")}",
-      canFail = false
-    ) match
-      case Left(err) => Left(err)
-      case Right(_) =>
-        reserved = reserved -- productIds
-        Right(())
-  }
-
-final class PaymentService:
-  private var charged = false
-
-  def charge(userId: String, amount: Double): Future[Either[String, Unit]] = Future {
-    callWithLog("PaymentService", "charge", s"userId=$userId, amount=$amount") match
-      case Left(err) => Left(err)
-      case Right(_) =>
-        if charged then Left("already charged")
-        else
-          charged = true
-          Right(())
-  }
-
-  def refund(userId: String, amount: Double): Future[Either[String, Unit]] = Future {
-    callWithLog(
-      "PaymentService",
-      "refund",
-      s"userId=$userId, amount=$amount",
-      canFail = false
-    ) match
-      case Left(err) => Left(err)
-      case Right(_) =>
-        if charged then charged = false
-        Right(())
-  }
-
-final class OrderService:
-  private var lastOrder: Option[OrderEntity] = None
-
-  def createOrder(userId: String, cartItems: CartItems): Future[Either[String, OrderEntity]] =
-    Future {
-      callWithLog(
-        "OrderService",
-        "createOrder",
-        s"userId=$userId, items=${cartItems.items.size}件"
-      ) match
-        case Left(err) => Left(err)
-        case Right(_) =>
-          val entity = OrderEntity(java.util.UUID.randomUUID().toString, userId, cartItems)
-          lastOrder = Some(entity)
-          Right(entity)
-    }
-
-  def cancelOrder(): Future[Either[String, Unit]] = Future {
-    callWithLog("OrderService", "cancelOrder", canFail = false) match
-      case Left(err) => Left(err)
-      case Right(_) =>
-        lastOrder = None
-        Right(())
-  }
-
-final class ShippingService:
-  private var shipped = false
-
-  def ship(orderId: String): Future[Either[String, Unit]] = Future {
-    callWithLog("ShippingService", "ship", s"orderId=$orderId") match
-      case Left(err) => Left(err)
-      case Right(_) =>
-        if shipped then Left("already shipped")
-        else
-          shipped = true
-          Right(())
-  }
-
-  def cancel(orderId: String): Future[Either[String, Unit]] = Future {
-    callWithLog("ShippingService", "cancel", s"orderId=$orderId", canFail = false) match
-      case Left(err) => Left(err)
-      case Right(_) =>
-        if shipped then shipped = false
-        Right(())
-  }
-
-final class NotificationService:
-
-  def sendOrderConfirmation(userId: String, orderId: String): Future[Either[String, Unit]] =
-    Future {
-      callWithLog(
-        "NotificationService",
-        "sendOrderConfirmation",
-        s"userId=$userId, orderId=$orderId"
-      ) match
-        case Left(err) => Left(err)
-        case Right(_)  => Right(())
-    }
 
 @main def runCheckoutDemo(): Unit =
   val userId = "user-123" // Mock user ID

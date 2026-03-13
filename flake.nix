@@ -53,6 +53,7 @@
             overlay-sbt
             overlay-scala
             overlay-temurin-bin
+            bashInteractive
           ];
           env = {
             JAVA_HOME = "${pkgs.overlay-temurin-bin}";

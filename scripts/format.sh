@@ -1,0 +1,2 @@
+sbt scalafmtAll
+sbt scalafmtSbt

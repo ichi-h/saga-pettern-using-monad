@@ -5,7 +5,7 @@ sbt {project_name}/run
 sbt {project_name}/compile
 sbt compile
 
-sbt scalafmtAll
-sbt scalafmtSbt
+./scripts/format.sh
+
 sbt scalafmtCheckAll
 ```

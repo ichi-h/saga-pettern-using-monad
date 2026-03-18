@@ -51,13 +51,14 @@ import mock.*
     )
   } yield orderEntity
 
-  val (state, result) = flow.value.run(SagaState.empty).unsafeRunSync()
-  result match
-    case Right(order) =>
-      println(s"Checkout succeeded: Order ID ${order.id}\nSteps: \n${state.stepsSummary}")
-    case Left(error) =>
-      state.compensate().value.unsafeRunSync() match
-        case Right(finalState) =>
-          println(s"Checkout failed: $error\nCompensation succeeded.\nSteps: \n${finalState.stepsSummary}")
-        case Left(compError) =>
-          println(s"Checkout failed: $error\nCompensation failed: $compError\nSteps: \n${state.stepsSummary}")
+  Saga.execWithCompensation(flow).unsafeRunSync() match
+    case SagaOutcome.Succeeded(state, orderEntity) =>
+      println(s"Checkout succeeded: Order ID ${orderEntity.id}\nSteps: \n${state.stepsSummary}")
+    case SagaOutcome.Compensated(state, errorMessage) =>
+      println(
+        s"Checkout failed: $errorMessage\nCompensation succeeded.\nSteps: \n${state.stepsSummary}"
+      )
+    case SagaOutcome.CompensationFailed(state, errorMessage, compError) =>
+      println(
+        s"Checkout failed: $errorMessage\nCompensation failed: $compError\nSteps: \n${state.stepsSummary}"
+      )

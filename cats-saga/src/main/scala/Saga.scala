@@ -3,6 +3,11 @@ import cats.effect.IO
 
 type Compensation = SagaState => EitherT[IO, String, SagaState]
 
+enum SagaOutcome[+A]:
+  case Succeeded(state: SagaState, value: A)
+  case Compensated(state: SagaState, error: String)
+  case CompensationFailed(state: SagaState, error: String, compensationError: String)
+
 case class SagaState(steps: Vector[String], compensations: Vector[Compensation]):
   def addStep(step: String): SagaState               = copy(steps = steps :+ step)
   def addCompensation(comp: Compensation): SagaState = copy(compensations = compensations :+ comp)
@@ -23,6 +28,22 @@ object Saga:
 
   val noCompensation: () => EitherT[IO, String, Unit] =
     () => EitherT.rightT(())
+
+  def execWithCompensation[A](
+      flow: Saga[A],
+      initialState: SagaState = SagaState.empty
+  ): IO[SagaOutcome[A]] =
+    flow.value.run(initialState).flatMap {
+      case (state, Right(value)) =>
+        IO.pure(SagaOutcome.Succeeded(state, value))
+      case (state, Left(error)) =>
+        state.compensate().value.map {
+          case Right(finalState) =>
+            SagaOutcome.Compensated(finalState, error)
+          case Left(compensationError) =>
+            SagaOutcome.CompensationFailed(state, error, compensationError)
+        }
+    }
 
   def step[A](
       name: String,

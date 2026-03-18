@@ -15,15 +15,9 @@ case class SagaState(steps: Vector[String], compensations: Vector[Compensation])
   def compensate()(using ExecutionContext): Future[Either[String, SagaState]] =
     compensations.foldRight(Future.successful(Right(this): Either[String, SagaState])) {
       (comp, accState) =>
-        accState.flatMap { result =>
-          result.fold(
-            err => Future.successful(Left(err)),
-            currentState =>
-              comp(currentState).map {
-                case Left(err)   => Right(currentState.addStep(s"compensation failed: $err"))
-                case Right(next) => Right(next)
-              }
-          )
+        accState.flatMap {
+          case Left(err)           => Future.successful(Left(err))
+          case Right(currentState) => comp(currentState)
         }
     }
 
@@ -70,7 +64,7 @@ object Saga:
   )(using ExecutionContext): Saga[A] =
     val compensation: Compensation = { state =>
       undo().map {
-        case Left(err) => Right(state.addStep(s"compensation failed: $name ($err)"))
+        case Left(err) => Left(s"compensation failed: $name ($err)")
         case Right(_)  => Right(state.addStep(s"compensation success: $name"))
       }
     }

@@ -29,7 +29,7 @@ object Saga:
   val noCompensation: () => EitherT[IO, String, Unit] =
     () => EitherT.rightT(())
 
-  def execWithCompensation[A](
+  def exec[A](
       flow: Saga[A],
       initialState: SagaState = SagaState.empty
   ): IO[SagaOutcome[A]] =

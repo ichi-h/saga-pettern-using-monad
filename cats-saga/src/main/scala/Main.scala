@@ -51,7 +51,7 @@ import mock.*
     )
   } yield orderEntity
 
-  Saga.execWithCompensation(flow).unsafeRunSync() match
+  Saga.exec(flow).unsafeRunSync() match
     case SagaOutcome.Succeeded(state, orderEntity) =>
       println(s"Checkout succeeded: Order ID ${orderEntity.id}\nSteps: \n${state.stepsSummary}")
     case SagaOutcome.Compensated(state, errorMessage) =>

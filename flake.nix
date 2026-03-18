@@ -53,6 +53,8 @@
             overlay-sbt
             overlay-scala
             overlay-temurin-bin
+            metals
+            coursier
             bashInteractive
           ];
           env = {

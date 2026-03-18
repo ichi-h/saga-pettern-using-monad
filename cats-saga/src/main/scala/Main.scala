@@ -54,10 +54,10 @@ import mock.*
   val (state, result) = flow.value.run(SagaState.empty).unsafeRunSync()
   result match
     case Right(order) =>
-      println(s"Checkout succeeded: Order ID ${order.id}")
+      println(s"Checkout succeeded: Order ID ${order.id}\nSteps: \n${state.stepsSummary}")
     case Left(error) =>
       state.compensate().value.unsafeRunSync() match
         case Right(finalState) =>
-          println(s"Checkout failed: $error")
+          println(s"Checkout failed: $error\nCompensation succeeded.\nSteps: \n${finalState.stepsSummary}")
         case Left(compError) =>
-          println(s"Checkout failed: $error\nCompensation failed: $compError")
+          println(s"Checkout failed: $error\nCompensation failed: $compError\nSteps: \n${state.stepsSummary}")

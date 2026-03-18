@@ -1,4 +1,4 @@
-import cats.data.{EitherT, State, StateT}
+import cats.data.{EitherT, StateT}
 import cats.effect.IO
 
 type Compensation = SagaState => EitherT[IO, String, SagaState]
@@ -6,6 +6,8 @@ type Compensation = SagaState => EitherT[IO, String, SagaState]
 case class SagaState(steps: Vector[String], compensations: Vector[Compensation]):
   def addStep(step: String): SagaState               = copy(steps = steps :+ step)
   def addCompensation(comp: Compensation): SagaState = copy(compensations = compensations :+ comp)
+
+  def stepsSummary: String = steps.map(s => s"- $s").mkString("\n")
 
   def compensate(): EitherT[IO, String, SagaState] =
     compensations.foldRight(EitherT.rightT[IO, String](this)) { (comp, accState) =>
@@ -31,7 +33,7 @@ object Saga:
       EitherT {
         undo().value.map {
           case Left(err) =>
-            Right(state.addStep(s"compensation failed: $name - $err")): Either[String, SagaState]
+            Left(s"compensation failed: $name ($err)"): Either[String, SagaState]
           case Right(_) =>
             Right(state.addStep(s"compensation success: $name")): Either[String, SagaState]
         }
@@ -42,7 +44,7 @@ object Saga:
         op().value.map {
           case r @ Right(_) =>
             (state.addStep(s"success: $name").addCompensation(undoComp), r)
-          case l @ Left(err) => (state.addStep(s"failed: $name - $err"), l)
+          case l @ Left(err) => (state.addStep(s"failed: $name ($err)"), l)
         }
       }
     }

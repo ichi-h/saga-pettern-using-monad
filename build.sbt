@@ -1,10 +1,10 @@
-val scala3Version = "3.8.1"
+val scala3Version = "3.3.7"
 
-// 各アプローチで共通の設定
 lazy val commonSettings = Seq(
   version                                := "0.1.0-SNAPSHOT",
   scalaVersion                           := scala3Version,
-  libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test
+  libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test,
+  libraryDependencies += "org.typelevel" %% "cats-core" % "2.13.0"
 )
 
 lazy val shared = project
@@ -22,9 +22,17 @@ lazy val stdlibSaga = project
     name := "stdlib-saga"
   )
 
+lazy val catsSaga = project
+  .in(file("cats-saga"))
+  .dependsOn(shared)
+  .settings(
+    commonSettings,
+    name := "cats-saga"
+  )
+
 lazy val root = project
   .in(file("."))
-  .aggregate(shared, stdlibSaga)
+  .aggregate(shared, stdlibSaga, catsSaga)
   .settings(
     name         := "saga-pattern-using-monad",
     version      := "0.1.0-SNAPSHOT",

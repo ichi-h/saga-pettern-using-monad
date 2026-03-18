@@ -1,0 +1,1 @@
+Scala 3.3.7 の sbt マルチプロジェクト構成。root は `shared`・`stdlib-saga`・`cats-saga` を aggregate している。`shared` には `domain` パッケージの値オブジェクト群と、`mock` パッケージのモックサービス／障害注入ヘルパー (`MockConfig.failureRate` と `callWithLog`) がある。`stdlib-saga` は `Future` ベースの独自 Saga モナド実装、`cats-saga` は `EitherT` + `StateT` + `IO` ベースの Saga 実装で、どちらもチェックアウト処理のデモを `@main def runCheckoutDemo()` で実行する。

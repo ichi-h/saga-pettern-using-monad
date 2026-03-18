@@ -1,0 +1,6 @@
+- `sbt compile`: ルート配下の全プロジェクトをコンパイルする
+- `sbt shared/compile stdlibSaga/compile catsSaga/compile`: サブプロジェクト単位でコンパイルする
+- `sbt stdlibSaga/run`: Future ベースの Saga デモを実行する
+- `sbt catsSaga/run`: cats-effect ベースの Saga デモを実行する
+- `./scripts/format.sh`: `scalafmtAll` と `scalafmtSbt` を順に実行する
+- `sbt scalafmtCheckAll`: Scala / sbt のフォーマット差分を確認する

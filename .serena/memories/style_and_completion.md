@@ -1,0 +1,1 @@
+Scala 3 のインデント構文を使う。`domain` パッケージにデータモデル、`mock` パッケージにモックサービスと設定を置く構成。副作用ログと障害注入は `callWithLog` に集約し、`MockServices.scala` と `MockServicesIO.scala` は同じ業務フローを `Future` と `EitherT[IO, String, *]` で揃えている。Saga 実装ではステップ名を文字列で積み上げ、補償処理の結果も `stepsSummary` に残す。作業後は最低でも `sbt compile` で確認し、実行フローに触れた変更なら `sbt stdlibSaga/run` または `sbt catsSaga/run` も使う。

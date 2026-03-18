@@ -50,7 +50,13 @@ given ExecutionContext = ExecutionContext.global
     flow.exec(SagaState.empty),
     scala.concurrent.duration.Duration.Inf
   ) match
-    case (state, Left(error)) =>
-      println(s"Checkout failed: $error\nSteps: \n${state.stepsSummary}")
-    case (state, Right(order)) =>
-      println(s"Checkout succeeded: Order ID ${order.id}\nSteps: \n${state.stepsSummary}")
+    case SagaOutcome.Succeeded(state, orderEntity) =>
+      println(s"Checkout succeeded: Order ID ${orderEntity.id}\nSteps: \n${state.stepsSummary}")
+    case SagaOutcome.Compensated(state, errorMessage) =>
+      println(
+        s"Checkout failed: $errorMessage\nCompensation succeeded.\nSteps: \n${state.stepsSummary}"
+      )
+    case SagaOutcome.CompensationFailed(state, errorMessage, compError) =>
+      println(
+        s"Checkout failed: $errorMessage\nCompensation failed: $compError\nSteps: \n${state.stepsSummary}"
+      )
